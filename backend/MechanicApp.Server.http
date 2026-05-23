@@ -1,0 +1,27 @@
+@MechanicApp.Server_HostAddress = http://localhost:5236
+
+### Get all cars
+GET {{MechanicApp.Server_HostAddress}}/api/car
+Accept: application/json
+
+###
+
+### Get car by ID
+GET {{MechanicApp.Server_HostAddress}}/api/car/1
+Accept: application/json
+
+###
+
+### Add a new car
+POST {{MechanicApp.Server_HostAddress}}/api/car
+Content-Type: application/json
+
+{
+  "make": "Toyota",
+  "model": "Camry",
+  "year": 2023,
+  "vin": "1HGBH41JXMN109186",
+  "ownerName": "John Doe"
+}
+
+###
