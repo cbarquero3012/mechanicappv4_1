@@ -1,25 +1,25 @@
 services:
-  # db:
-  #   image: postgres:15
-  #   container_name: mechanic_db_container1
-  #   environment:
-  #     POSTGRES_USER: ${POSTGRES_USER:-postgres}
-  #     POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-12345678}
-  #     POSTGRES_DB: ${POSTGRES_DB:-mechanic_db}
-  #   volumes:
-  #     - postgres_data:/var/lib/postgresql/data
-  #     - ./init_control_plane.sql:/docker-entrypoint-initdb.d/01_control_plane.sql
-  #     - ./init_template_db.sh:/docker-entrypoint-initdb.d/02_template_db.sh
-  #     - ./init_template.sql:/tmp/mechanic_template_schema.sql
-  #   ports:
-  #     - "5434:5432"
-  #   healthcheck:
-  #     test: ["CMD-SHELL", "pg_isready -U postgres -d mechanic_db"]
-  #     interval: 5s
-  #     timeout: 5s
-  #     retries: 10
-  #     start_period: 10s
-  #   restart: unless-stopped
+  db:
+     image: postgres:15
+     container_name: mechanic_db_container1
+     environment:
+       POSTGRES_USER: ${POSTGRES_USER:-postgres}
+       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-12345678}
+       POSTGRES_DB: ${POSTGRES_DB:-mechanic_db}
+     volumes:
+       - postgres_data:/var/lib/postgresql/data
+       - ./init_control_plane.sql:/docker-entrypoint-initdb.d/01_control_plane.sql
+       - ./init_template_db.sh:/docker-entrypoint-initdb.d/02_template_db.sh
+       - ./init_template.sql:/tmp/mechanic_template_schema.sql
+     ports:
+       - "5434:5432"
+     healthcheck:
+       test: ["CMD-SHELL", "pg_isready -U postgres -d mechanic_db"]
+       interval: 5s
+       timeout: 5s
+       retries: 10
+       start_period: 10s
+     restart: unless-stopped
 
   backend:
     build: 
