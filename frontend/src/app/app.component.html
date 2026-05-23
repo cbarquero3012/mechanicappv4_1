@@ -1,0 +1,65 @@
+export const environment = {
+  production: true,
+  appName: 'Mechanic App',  // 👈 Change this for production
+  logo: 'assets/logo.svg'
+};
+
+<h1>{{ title }}</h1>
+
+<div class="container">
+  <div *ngIf="errorMessage" class="error-message">{{ errorMessage }}</div>
+
+  <h2>Add New Car</h2>
+  <form (ngSubmit)="addCar()" #carForm="ngForm">
+    <p>
+      <input
+        [(ngModel)]="newCar.make"
+        name="make"
+        placeholder="Make"
+        required
+      />
+    </p>
+    <p>
+      <input
+        [(ngModel)]="newCar.model"
+        name="model"
+        placeholder="Model"
+        required
+      />
+    </p>
+    <p>
+      <input
+        [(ngModel)]="newCar.year"
+        name="year"
+        type="number"
+        placeholder="Year"
+        required
+      />
+    </p>
+    <p><input [(ngModel)]="newCar.vin" name="vin" placeholder="VIN" /></p>
+    <p>
+      <input
+        [(ngModel)]="newCar.ownerName"
+        name="ownerName"
+        placeholder="Owner Name"
+        required
+      />
+    </p>
+    <button type="submit" [disabled]="!carForm.valid">Add Car</button>
+  </form>
+
+  <h2>Car List</h2>
+  <p *ngIf="cars.length === 0" class="empty-message">
+    No cars found. Add one above!
+  </p>
+  <ul>
+    <li *ngFor="let car of cars">
+      <span class="car-info">
+        {{ car.year }} {{ car.make }} {{ car.model }} &mdash;
+        {{ car.ownerName }}
+        <span *ngIf="car.vin"> ({{ car.vin }})</span>
+      </span>
+      <button class="delete-btn" (click)="deleteCar(car.id)">Delete</button>
+    </li>
+  </ul>
+</div>
