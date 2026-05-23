@@ -1,0 +1,110 @@
+services:
+  # db:
+  #   image: postgres:15
+  #   container_name: mechanic_db_container1
+  #   environment:
+  #     POSTGRES_USER: ${POSTGRES_USER:-postgres}
+  #     POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-12345678}
+  #     POSTGRES_DB: ${POSTGRES_DB:-mechanic_db}
+  #   volumes:
+  #     - postgres_data:/var/lib/postgresql/data
+  #     - ./init_control_plane.sql:/docker-entrypoint-initdb.d/01_control_plane.sql
+  #     - ./init_template_db.sh:/docker-entrypoint-initdb.d/02_template_db.sh
+  #     - ./init_template.sql:/tmp/mechanic_template_schema.sql
+  #   ports:
+  #     - "5434:5432"
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "pg_isready -U postgres -d mechanic_db"]
+  #     interval: 5s
+  #     timeout: 5s
+  #     retries: 10
+  #     start_period: 10s
+  #   restart: unless-stopped
+
+  backend:
+    build: 
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: mechanic_backend1
+    environment:
+      - ConnectionStrings__DefaultConnection=Host=db;Port=5432;Database=${POSTGRES_DB:-mechanic_db};Username=${POSTGRES_USER:-postgres};Password=${POSTGRES_PASSWORD:-12345678};Minimum Pool Size=2;Maximum Pool Size=20;Timeout=30;Command Timeout=30
+      - ConnectionStrings__ControlPlane=Host=db;Port=5432;Database=${POSTGRES_DB:-mechanic_db};Username=${POSTGRES_USER:-postgres};Password=${POSTGRES_PASSWORD:-12345678};Minimum Pool Size=1;Maximum Pool Size=10;Timeout=30;Command Timeout=30
+      - ConnectionStrings__AdminConnection=Host=db;Port=5432;Database=postgres;Username=${POSTGRES_USER:-postgres};Password=${POSTGRES_PASSWORD:-12345678};Timeout=30;Command Timeout=60
+      - ASPNETCORE_URLS=http://+:80
+    volumes:
+      - uploads_data:/app/wwwroot/uploads
+    ports:
+      - "5001:80"
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: mechanic_frontend1
+    ports:
+      - "4201:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+  backup:
+    image: postgres:15
+    container_name: mechanic_db_backup1
+    environment:
+      PGHOST: db
+      PGPORT: "5432"
+      PGUSER: ${POSTGRES_USER:-postgres}
+      PGPASSWORD: ${POSTGRES_PASSWORD:-12345678}
+    volumes:
+      - db_backups:/backups
+    depends_on:
+      db:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        while true; do
+          TIMESTAMP=$$(date +%Y%m%d_%H%M%S)
+          echo "[backup] Starting backups at $$(date)..."
+          DATABASES=$$(psql -U postgres -t -A -c "SELECT datname FROM pg_database WHERE datname NOT IN ('postgres','template0','template1') AND datistemplate = false ORDER BY datname;")
+          for DB in $$DATABASES; do
+            if echo "$$DB" | grep -qE '^[a-zA-Z0-9_]+$$'; then
+              FILENAME="/backups/$${DB}_$${TIMESTAMP}.sql"
+              echo "[backup] Dumping $$DB..."
+              pg_dump --format=plain --inserts --rows-per-insert=1000 --clean --if-exists --no-owner --no-privileges -d "$$DB" -f "$$FILENAME"
+              if [ $$? -eq 0 ]; then
+                sed -i '/^\\restrict /d; /^\\unrestrict /d' "$$FILENAME"
+                echo "[backup] Success: $$FILENAME"
+              else
+                echo "[backup] FAILED: $$DB at $$(date)"
+              fi
+            else
+              echo "[backup] SKIPPED (unsafe name): $$DB"
+            fi
+          done
+          echo "[backup] Backing up template database..."
+          FILENAME="/backups/mechanic_template_$${TIMESTAMP}.sql"
+          pg_dump --format=plain --inserts --rows-per-insert=1000 --clean --if-exists --no-owner --no-privileges -d "mechanic_template" -f "$$FILENAME" 2>/dev/null
+          if [ $$? -eq 0 ]; then
+            sed -i '/^\\restrict /d; /^\\unrestrict /d' "$$FILENAME"
+            echo "[backup] Success: $$FILENAME"
+          else
+            echo "[backup] Template backup skipped (may not exist)"
+          fi
+          echo "[backup] Rotating old backups (keeping last 7 per database)..."
+          for DB in $$DATABASES mechanic_template; do
+            ls -1t /backups/$${DB}_*.sql 2>/dev/null | tail -n +8 | xargs rm -f 2>/dev/null
+          done
+          echo "[backup] All backups completed at $$(date)"
+          sleep 86400
+        done
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  uploads_data:
+  db_backups:
